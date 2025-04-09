@@ -258,19 +258,100 @@ This section covers various performance tests to evaluate EFA performance betwee
 
 Bandwidth tests measure the maximum throughput between the instances.
 
-#### RDMA Send Bandwidth Test
+#### RDMA Send Bandwidth Test with SRD (Recommended)
+
+The following commands use the Scalable Reliable Datagram (SRD) connection type, which is recommended for EFA:
 
 On the server instance (efa-server-1.zzhe.xyz):
 
 ```bash
-ib_send_bw -d rdmap47s0 -x 0 -F -R
+ib_send_bw -c SRD -x 0 -F -Q 1 -a
 ```
 
 On the client instance (efa-client-1.zzhe.xyz):
 
 ```bash
+ib_send_bw -c SRD -x 0 -F -Q 1 -a 172.31.94.37
+```
+
+Parameters explained:
+- `-c SRD`: Use Scalable Reliable Datagram connection type, which is optimized for EFA
+- `-x 0`: Use RDMA CM for connection establishment with GID index 0
+- `-F`: Use events for completions instead of polling
+- `-Q 1`: Use a single completion queue for both send and receive operations
+- `-a`: Use asynchronous send operations
+
+Sample output from the client:
+
+```
+---------------------------------------------------------------------------------------
+                    Send BW Test
+ Dual-port       : OFF		Device         : rdmap47s0
+ Number of qps   : 1		Transport type : Unknown
+ Connection type : SRD		Using SRQ      : OFF
+ PCIe relax order: ON		Lock-free      : OFF
+ ibv_wr* API     : ON		Using DDP      : OFF
+ TX depth        : 128
+ CQ Moderation   : 1
+ CQE Poll Batch  : 16
+ Mtu             : 4096[B]
+ Link type       : IB
+ GID index       : 0
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0000 QPN 000000 PSN 0xcd1e3c
+ GID: 254:128:00:00:00:00:00:00:16:76:116:255:254:70:225:171
+ remote address: LID 0000 QPN 000000 PSN 0xec3763
+ GID: 254:128:00:00:00:00:00:00:16:171:141:255:254:144:127:217
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MiB/sec]    BW average[MiB/sec]   MsgRate[Mpps]
+ 2          1000             4.42               1.09   		     0.570447
+ 4          1000             8.73               8.18   		     2.144697
+ 8          1000             17.70              17.49  		     2.292482
+ 16         1000             35.49              34.79  		     2.279728
+ 32         1000             68.87              68.82  		     2.255256
+ 64         1000             140.70             132.17 		     2.165514
+ 128        1000             277.87             263.74 		     2.160544
+ 256        1000             541.29             496.96 		     2.035546
+ 512        1000             1124.72            1113.12		     2.279672
+ 1024       1000             2224.69            2090.20		     2.140363
+ 2048       1000             4140.40            3568.42		     1.827032
+ 4096       1000             7433.24            5455.37		     1.396573
+ 8192       1000             10987.64            8909.75		     1.140448
+---------------------------------------------------------------------------------------
+```
+
+The output shows bandwidth measurements for different message sizes, from 2 bytes to 8192 bytes. For each message size, the test sends 1000 messages and measures:
+
+- **BW peak[MiB/sec]**: Maximum bandwidth achieved during the test
+- **BW average[MiB/sec]**: Average bandwidth over the test duration
+- **MsgRate[Mpps]**: Message rate in millions of packets per second
+
+Note that bandwidth increases with message size, reaching about 9 GB/s (8909.75 MiB/sec) with 8192-byte messages. The message rate is highest (around 2.2-2.3 Mpps) for medium-sized messages (8-512 bytes) and decreases for larger messages.
+
+#### Alternative Bandwidth Test Commands
+
+You can also use these alternative commands, but they may not work as reliably with EFA:
+
+On the server instance:
+
+```bash
+ib_send_bw -d rdmap47s0 -x 0 -F -R
+```
+
+On the client instance:
+
+```bash
 ib_send_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
 ```
+
+Parameters explained:
+- `-d rdmap47s0`: Use the EFA device (replace with your device name)
+- `-x 0`: Use RDMA CM for connection establishment
+- `-F`: Use events for completions
+- `-R`: Print bandwidth in GB/s (instead of MB/s)
 
 #### RDMA Write Bandwidth Test
 
@@ -286,15 +367,9 @@ On the client instance:
 ib_write_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
 ```
 
-Parameters explained:
-- `-d rdmap47s0`: Use the EFA device (replace with your device name)
-- `-x 0`: Use RDMA CM for connection establishment
-- `-F`: Use events for completions
-- `-R`: Print bandwidth in GB/s (instead of MB/s)
-
 Expected results for m6i.metal instances:
-- Send bandwidth: ~12-20 GB/s
-- Write bandwidth: ~12-20 GB/s
+- Send bandwidth: ~9-11 GB/s for large messages (8KB)
+- Write bandwidth: ~9-11 GB/s for large messages (8KB)
 
 ### Latency Measurements
 
