@@ -353,7 +353,96 @@ Parameters explained:
 - `-F`: Use events for completions
 - `-R`: Print bandwidth in GB/s (instead of MB/s)
 
-#### RDMA Write Bandwidth Test
+#### RDMA Write Bandwidth Test with SRD (Recommended)
+
+The following commands use the Scalable Reliable Datagram (SRD) connection type, which is recommended for EFA:
+
+On the server instance:
+
+```bash
+ib_write_bw -c SRD -x 0 -F -Q 1 -a
+```
+
+On the client instance:
+
+```bash
+ib_write_bw -c SRD -x 0 -F -Q 1 -a 172.31.94.37
+```
+
+Parameters explained:
+- `-c SRD`: Use Scalable Reliable Datagram connection type, which is optimized for EFA
+- `-x 0`: Use RDMA CM for connection establishment with GID index 0
+- `-F`: Use events for completions instead of polling
+- `-Q 1`: Use a single completion queue for both send and receive operations
+- `-a`: Use asynchronous send operations
+
+Sample output from the client:
+
+```
+---------------------------------------------------------------------------------------
+                    RDMA_Write BW Test
+ Dual-port       : OFF		Device         : rdmap47s0
+ Number of qps   : 1		Transport type : Unknown
+ Connection type : SRD		Using SRQ      : OFF
+ PCIe relax order: ON		Lock-free      : OFF
+ ibv_wr* API     : ON		Using DDP      : OFF
+ TX depth        : 128
+ CQ Moderation   : 1
+ CQE Poll Batch  : 16
+ Mtu             : 4096[B]
+ Link type       : IB
+ GID index       : 0
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0000 QPN 000000 PSN 0xb39400 RKey 0x500000 VAddr 0x007f985efff000
+ GID: 254:128:00:00:00:00:00:00:16:76:116:255:254:70:225:171
+ remote address: LID 0000 QPN 000000 PSN 0x75a408 RKey 0x500000 VAddr 0x007f42fd1ff000
+ GID: 254:128:00:00:00:00:00:00:16:171:141:255:254:144:127:217
+---------------------------------------------------------------------------------------
+ #bytes     #iterations    BW peak[MiB/sec]    BW average[MiB/sec]   MsgRate[Mpps]
+ 2          5000             4.17               2.69   		     1.411707
+ 4          5000             8.24               8.21   		     2.151319
+ 8          5000             16.41              16.34  		     2.141997
+ 16         5000             33.02              32.97  		     2.160398
+ 32         5000             66.14              65.95  		     2.161065
+ 64         5000             132.19             131.66 		     2.157181
+ 128        5000             264.58             263.97 		     2.162447
+ 256        5000             526.40             523.88 		     2.145799
+ 512        5000             1052.80            1050.20		     2.150820
+ 1024       5000             2090.07            2086.50		     2.136572
+ 2048       5000             4198.76            4189.44		     2.144995
+ 4096       5000             8274.83            8258.26		     2.114114
+ 8192       5000             11041.07            7002.06		     0.896264
+ 16384      5000             9168.91            6439.53		     0.412130
+ 32768      5000             10312.37            6202.02		     0.198465
+ 65536      5000             10333.03            6088.42		     0.097415
+ 131072     5000             10513.66            6032.77		     0.048262
+ 262144     5000             9515.13            6006.08		     0.024024
+ 524288     5000             10181.11            5992.38		     0.011985
+ 1048576    5000             9536.39            5985.55		     0.005986
+ 2097152    5000             9420.36            5982.26		     0.002991
+ 4194304    5000             9177.98            5980.54		     0.001495
+ 8388608    5000             8574.49            5979.70		     0.000747
+---------------------------------------------------------------------------------------
+```
+
+The output shows bandwidth measurements for different message sizes, from 2 bytes to 8388608 bytes (8MB). For each message size, the test sends 5000 messages and measures:
+
+- **BW peak[MiB/sec]**: Maximum bandwidth achieved during the test
+- **BW average[MiB/sec]**: Average bandwidth over the test duration
+- **MsgRate[Mpps]**: Message rate in millions of packets per second
+
+Key observations from the results:
+1. Bandwidth increases with message size up to about 4-8KB, then stabilizes around 6 GB/s for larger messages
+2. Peak bandwidth reaches over 11 GB/s for 8KB messages
+3. Message rate is highest (around 2.1-2.2 Mpps) for medium-sized messages (32-4096 bytes)
+4. For very large messages (1MB-8MB), the bandwidth stabilizes at around 6 GB/s
+
+#### Alternative Write Bandwidth Test Commands
+
+You can also use these alternative commands, but they may not work as reliably with EFA:
 
 On the server instance:
 
@@ -369,7 +458,7 @@ ib_write_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
 
 Expected results for m6i.metal instances:
 - Send bandwidth: ~9-11 GB/s for large messages (8KB)
-- Write bandwidth: ~9-11 GB/s for large messages (8KB)
+- Write bandwidth: ~6 GB/s for very large messages (1MB-8MB)
 
 ### Latency Measurements
 
