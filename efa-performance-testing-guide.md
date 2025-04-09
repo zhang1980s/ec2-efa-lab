@@ -300,7 +300,81 @@ Expected results for m6i.metal instances:
 
 Latency tests measure the time it takes for a message to travel from one instance to another.
 
-#### RDMA Send Latency Test
+#### RDMA Send Latency Test with SRD (Recommended)
+
+The following commands use the Scalable Reliable Datagram (SRD) connection type, which is recommended for EFA:
+
+On the server instance:
+
+```bash
+ib_send_lat -c SRD -x 0 -F -Q 1 -a
+```
+
+On the client instance:
+
+```bash
+ib_send_lat -c SRD -x 0 -F -Q 1 -a 172.31.94.37
+```
+
+Parameters explained:
+- `-c SRD`: Use Scalable Reliable Datagram connection type, which is optimized for EFA
+- `-x 0`: Use RDMA CM for connection establishment with GID index 0
+- `-F`: Use events for completions instead of polling
+- `-Q 1`: Use a single completion queue for both send and receive operations
+- `-a`: Use asynchronous send operations
+
+Sample output:
+
+```
+---------------------------------------------------------------------------------------
+                    Send Latency Test
+ Dual-port       : OFF		Device         : rdmap47s0
+ Number of qps   : 1		Transport type : Unknown
+ Connection type : SRD		Using SRQ      : OFF
+ PCIe relax order: ON		Lock-free      : OFF
+ ibv_wr* API     : ON		Using DDP      : OFF
+ TX depth        : 1
+ Mtu             : 4096[B]
+ Link type       : IB
+ GID index       : 0
+ Max inline data : 32[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0000 QPN 000000 PSN 0x3b541c
+ GID: 254:128:00:00:00:00:00:00:16:76:116:255:254:70:225:171
+ remote address: LID 0000 QPN 000000 PSN 0x883f65
+ GID: 254:128:00:00:00:00:00:00:16:171:141:255:254:144:127:217
+---------------------------------------------------------------------------------------
+ #bytes #iterations    t_min[usec]    t_max[usec]  t_typical[usec]    t_avg[usec]    t_stdev[usec]   99% percentile[usec]   99.9% percentile[usec]
+ 2       1000          14.11          1210.34      15.78    	       22.98       	90.04  		22.37   		1210.34
+ 4       1000          14.26          23.15        15.81    	       15.99       	0.69   		20.03   		23.15
+ 8       1000          14.27          22.00        15.83    	       16.00       	0.69   		19.69   		22.00
+ 16      1000          14.22          21.02        15.74    	       15.96       	0.66   		19.77   		21.02
+ 32      1000          14.10          21.66        15.80    	       15.99       	0.66   		19.61   		21.66
+ 64      1000          14.87          22.25        16.24    	       16.39       	0.59   		19.73   		22.25
+ 128     1000          14.86          22.11        16.30    	       16.45       	0.64   		20.02   		22.11
+ 256     1000          14.65          24.43        16.33    	       16.49       	0.63   		19.77   		24.43
+ 512     1000          14.71          21.75        16.37    	       16.53       	0.66   		20.41   		21.75
+ 1024    1000          14.87          24.35        16.48    	       16.67       	0.68   		20.62   		24.35
+ 2048    1000          14.92          22.10        16.76    	       16.91       	0.61   		20.16   		22.10
+ 4096    1000          15.65          24.85        17.59    	       17.71       	0.68   		21.86   		24.85
+ 8192    1000          18.05          26.08        19.51    	       19.67       	0.63   		23.37   		26.08
+---------------------------------------------------------------------------------------
+```
+
+The output shows latency measurements for different message sizes, from 2 bytes to 8192 bytes. For each message size, the test sends 1000 messages and measures various latency metrics:
+- **t_min**: Minimum latency (14-18 μs for m6i.metal)
+- **t_max**: Maximum latency (can spike to over 1000 μs in some cases)
+- **t_typical**: Most common latency value (15-20 μs for m6i.metal)
+- **t_avg**: Average latency (16-20 μs for m6i.metal)
+- **t_stdev**: Standard deviation of latency measurements
+- **99% percentile**: 99% of messages had latency below this value
+- **99.9% percentile**: 99.9% of messages had latency below this value
+
+#### Alternative Latency Test Commands
+
+You can also use these alternative commands, but they may not work as reliably with EFA:
 
 On the server instance:
 
@@ -727,6 +801,44 @@ If you're having trouble establishing connections:
    ```
 
 3. Verify that the security group allows all traffic between the instances
+
+#### ADDR_ERROR Issues
+
+If you encounter errors like this when running perftest commands:
+
+```
+$ ib_send_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
+Received 10 times ADDR_ERROR
+ Unable to perform rdma_client function
+ Unable to init the socket connection
+```
+
+This typically indicates one of the following issues:
+
+1. **Security group configuration**: Ensure that all traffic is allowed between the instances in the security group
+
+2. **EFA service not running**: Check if the EFA service is running on both instances:
+   ```bash
+   sudo systemctl status rdma
+   ```
+   If not running, start it:
+   ```bash
+   sudo systemctl start rdma
+   ```
+
+3. **Incorrect device name**: Verify you're using the correct EFA device name:
+   ```bash
+   ls /sys/class/infiniband/
+   ```
+
+4. **IP address resolution**: Try using the private IP address directly instead of hostname
+
+5. **Firewall rules**: Check if there are any firewall rules blocking the connection:
+   ```bash
+   sudo iptables -L
+   ```
+
+6. **Network configuration**: Verify that both instances are in the same subnet and can communicate with each other
 
 ### Best Practices for EFA Performance
 
