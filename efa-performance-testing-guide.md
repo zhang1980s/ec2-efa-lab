@@ -331,27 +331,6 @@ The output shows bandwidth measurements for different message sizes, from 2 byte
 
 Note that bandwidth increases with message size, reaching about 9 GB/s (8909.75 MiB/sec) with 8192-byte messages. The message rate is highest (around 2.2-2.3 Mpps) for medium-sized messages (8-512 bytes) and decreases for larger messages.
 
-#### Alternative Bandwidth Test Commands
-
-You can also use these alternative commands, but they may not work as reliably with EFA:
-
-On the server instance:
-
-```bash
-ib_send_bw -d rdmap47s0 -x 0 -F -R
-```
-
-On the client instance:
-
-```bash
-ib_send_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
-```
-
-Parameters explained:
-- `-d rdmap47s0`: Use the EFA device (replace with your device name)
-- `-x 0`: Use RDMA CM for connection establishment
-- `-F`: Use events for completions
-- `-R`: Print bandwidth in GB/s (instead of MB/s)
 
 #### RDMA Write Bandwidth Test with SRD (Recommended)
 
@@ -440,25 +419,6 @@ Key observations from the results:
 3. Message rate is highest (around 2.1-2.2 Mpps) for medium-sized messages (32-4096 bytes)
 4. For very large messages (1MB-8MB), the bandwidth stabilizes at around 6 GB/s
 
-#### Alternative Write Bandwidth Test Commands
-
-You can also use these alternative commands, but they may not work as reliably with EFA:
-
-On the server instance:
-
-```bash
-ib_write_bw -d rdmap47s0 -x 0 -F -R
-```
-
-On the client instance:
-
-```bash
-ib_write_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
-```
-
-Expected results for m6i.metal instances:
-- Send bandwidth: ~9-11 GB/s for large messages (8KB)
-- Write bandwidth: ~6 GB/s for very large messages (1MB-8MB)
 
 ### Latency Measurements
 
@@ -536,41 +496,99 @@ The output shows latency measurements for different message sizes, from 2 bytes 
 - **99% percentile**: 99% of messages had latency below this value
 - **99.9% percentile**: 99.9% of messages had latency below this value
 
-#### Alternative Latency Test Commands
 
-You can also use these alternative commands, but they may not work as reliably with EFA:
+#### RDMA Write Latency Test with SRD (Recommended)
+
+The following commands use the Scalable Reliable Datagram (SRD) connection type, which is recommended for EFA:
 
 On the server instance:
 
 ```bash
-ib_send_lat -d rdmap47s0 -x 0 -F
+ib_write_lat -c SRD -x 0 -F -Q 1 --inline_size 0 -a
 ```
 
 On the client instance:
 
 ```bash
-ib_send_lat -d rdmap47s0 -x 0 -F 172.31.94.37
+ib_write_lat -c SRD -x 0 -F -Q 1 --inline_size 0 -a 172.31.94.37
 ```
 
-#### RDMA Write Latency Test
+Parameters explained:
+- `-c SRD`: Use Scalable Reliable Datagram connection type, which is optimized for EFA
+- `-x 0`: Use RDMA CM for connection establishment with GID index 0
+- `-F`: Use events for completions instead of polling
+- `-Q 1`: Use a single completion queue for both send and receive operations
+- `--inline_size 0`: Disable inline data
+- `-a`: Use asynchronous send operations
 
-On the server instance:
+Sample output from the client:
 
-```bash
-ib_write_lat -d rdmap47s0 -x 0 -F
+```
+---------------------------------------------------------------------------------------
+                    RDMA_Write Latency Test
+ Dual-port       : OFF		Device         : rdmap47s0
+ Number of qps   : 1		Transport type : Unknown
+ Connection type : SRD		Using SRQ      : OFF
+ PCIe relax order: OFF		Lock-free      : OFF
+ ibv_wr* API     : ON		Using DDP      : OFF
+ TX depth        : 1
+ Mtu             : 4096[B]
+ Link type       : IB
+ GID index       : 0
+ Max inline data : 0[B]
+ rdma_cm QPs	 : OFF
+ Data ex. method : Ethernet
+---------------------------------------------------------------------------------------
+ local address: LID 0000 QPN 000000 PSN 0xf8276e RKey 0x800000 VAddr 0x007f5d659ff000
+ GID: 254:128:00:00:00:00:00:00:16:76:116:255:254:70:225:171
+ remote address: LID 0000 QPN 000000 PSN 0x7c5b38 RKey 0x800000 VAddr 0x007f0047fff000
+ GID: 254:128:00:00:00:00:00:00:16:171:141:255:254:144:127:217
+---------------------------------------------------------------------------------------
+ #bytes #iterations    t_min[usec]    t_max[usec]  t_typical[usec]    t_avg[usec]    t_stdev[usec]   99% percentile[usec]   99.9% percentile[usec]
+ 2       1000          14.56          1150.90      17.54    	       22.67       	73.04  		20.88   		1150.90
+ 4       1000          15.12          23.23        17.63    	       17.69       	0.80   		20.83   		23.23
+ 8       1000          15.05          22.73        17.63    	       17.67       	0.69   		20.35   		22.73
+ 16      1000          14.91          23.01        17.62    	       17.65       	0.73   		20.39   		23.01
+ 32      1000          15.26          22.61        17.64    	       17.70       	0.73   		20.44   		22.61
+ 64      1000          15.24          22.38        17.67    	       17.73       	0.73   		20.52   		22.38
+ 128     1000          15.05          21.18        17.63    	       17.67       	0.75   		20.28   		21.18
+ 256     1000          15.14          21.91        17.75    	       17.77       	0.76   		20.45   		21.91
+ 512     1000          14.91          21.10        17.76    	       17.76       	0.72   		20.25   		21.10
+ 1024    1000          15.08          22.41        17.92    	       17.95       	0.80   		20.74   		22.41
+ 2048    1000          15.47          21.40        18.13    	       18.14       	0.75   		20.63   		21.40
+ 4096    1000          15.87          23.04        18.81    	       18.84       	0.81   		21.48   		23.04
+ 8192    1000          17.18          25.99        20.74    	       20.78       	0.84   		23.66   		25.99
+ 16384   1000          18.77          28.81        22.32    	       22.36       	0.85   		25.22   		28.81
+ 32768   1000          21.94          29.63        24.84    	       24.87       	0.81   		27.58   		29.63
+ 65536   1000          22.28          31.56        25.31    	       25.45       	1.08   		29.38   		31.56
+ 131072  1000          25.52          35.83        30.44    	       30.45       	1.01   		34.12   		35.83
+ 262144  1000          40.35          46.03        41.77    	       41.84       	0.27   		43.69   		46.03
+ 524288  1000          61.66          65.86        63.24    	       63.27       	0.22   		64.74   		65.86
+ 1048576 1000          105.03         109.40       106.40   	       106.44      	0.21   		107.85  		109.40
+ 2097152 1000          191.00         206.93       195.32   	       195.96      	2.27   		204.71  		206.93
+ 4194304 1000          321.96         368.60       338.35   	       338.76      	5.58   		353.42  		368.60
+ 8388608 1000          705.15         716.24       711.04   	       711.01      	0.73   		713.55  		716.24
+---------------------------------------------------------------------------------------
 ```
 
-On the client instance:
+The output shows latency measurements for different message sizes, from 2 bytes to 8388608 bytes (8MB). For each message size, the test sends 1000 messages and measures various latency metrics:
 
-```bash
-ib_write_lat -d rdmap47s0 -x 0 -F 172.31.94.37
-```
+- **t_min[usec]**: Minimum latency in microseconds
+- **t_max[usec]**: Maximum latency in microseconds
+- **t_typical[usec]**: Most common latency value in microseconds
+- **t_avg[usec]**: Average latency in microseconds
+- **t_stdev[usec]**: Standard deviation of latency measurements
+- **99% percentile[usec]**: 99% of messages had latency below this value
+- **99.9% percentile[usec]**: 99.9% of messages had latency below this value
 
-Expected results for m6i.metal instances:
-- Send latency: ~15-25 μs
-- Write latency: ~15-25 μs
+Key observations from the results:
+1. For small messages (2-4096 bytes), latency is very low, around 17-19 μs
+2. Latency increases with message size, especially for messages larger than 128KB
+3. For very large messages (8MB), latency reaches around 711 μs
+4. The first message in each test may experience higher latency (as shown by the t_max value for 2-byte messages)
 
-### Message Rate Testing
+
+### Message Rate Testing (To be verify)
 
 Message rate tests measure how many messages can be sent per second.
 
@@ -595,7 +613,7 @@ Calculate message rate by dividing the number of iterations by the total time:
 Expected results for m6i.metal instances:
 - Message rate: ~100,000-200,000 messages per second for small messages
 
-### RDMA Operations Performance
+### RDMA Operations Performance (To be verify)
 
 Compare the performance of different RDMA verbs (READ, WRITE, SEND).
 
@@ -615,7 +633,7 @@ ib_read_bw -d rdmap47s0 -x 0 -F -R 172.31.94.37
 
 Compare the results with the WRITE and SEND tests to understand the performance differences between RDMA operations.
 
-### Scalability Testing
+### Scalability Testing (To be verify)
 
 Test how performance scales with multiple parallel streams.
 
@@ -650,11 +668,11 @@ mpstat 1
 
 This will show CPU utilization statistics every second. Compare CPU utilization between EFA and TCP/IP tests to understand the efficiency benefits of EFA.
 
-### Bidirectional Performance
+### Bidirectional Performance (To be verify)
 
 Test simultaneous data transfer in both directions.
 
-#### Bidirectional Bandwidth Test
+#### Bidirectional Bandwidth Test (To be verify)
 
 On the server instance:
 
@@ -686,7 +704,7 @@ Install iperf3 for TCP/IP performance testing:
 sudo dnf install -y iperf3
 ```
 
-### Bandwidth Comparison
+### Bandwidth Comparison (To be verify)
 
 #### EFA Bandwidth Test
 
@@ -741,7 +759,7 @@ ib_send_bw -d rdmap47s0 -x 0 -F -R -T 90 172.31.94.37
 Parameters explained:
 - `-T 90`: Use TCP mode with a timeout of 90 seconds
 
-### Latency Comparison
+### Latency Comparison (To be verify)
 
 #### EFA Latency Test
 
